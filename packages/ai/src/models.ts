@@ -1,20 +1,23 @@
-import { MODELS } from "./models.generated.js";
+// Type-only: the generated multi-provider catalog is used solely for the
+// `AllModels` type below (autocomplete in getModel/getModels). It is NOT loaded
+// at runtime, so non-Gloo providers never enter the registry.
+import type { MODELS } from "./models.generated.js";
 import { MODELS_GLOO } from "./models.gloo.js";
 import type { Api, KnownProvider, Model, Usage } from "./types.js";
 
 const modelRegistry: Map<string, Map<string, Model<Api>>> = new Map();
 
-// Initialize registry from MODELS on module load. MODELS_GLOO merges in
-// after the upstream-generated MODELS so the Gloo entries survive an
-// upstream regeneration (`npm run generate-models`) — the regen rewrites
-// models.generated.ts but never touches models.gloo.ts.
-for (const [provider, models] of Object.entries(MODELS)) {
-	const providerModels = new Map<string, Model<Api>>();
-	for (const [id, model] of Object.entries(models)) {
-		providerModels.set(id, model as Model<Api>);
-	}
-	modelRegistry.set(provider, providerModels);
-}
+// This is the GlooAI fork: Gloo is the ONLY provider. The upstream-generated
+// multi-provider catalog (`MODELS`) is deliberately NOT loaded into the runtime
+// registry, so `getProviders()` returns just `["gloo"]` and the model picker /
+// login surfaces in the coding-agent only ever show Gloo. `MODELS` is still
+// imported below purely for the type-level `AllModels` so `getModel`/`getModels`
+// keep their generic autocomplete; flipping a single line here re-enables the
+// full upstream catalog if this fork ever needs it.
+//
+// MODELS_GLOO is the sole runtime source. It survives an upstream regeneration
+// (`npm run generate-models`) because the regen rewrites models.generated.ts but
+// never touches models.gloo.ts.
 for (const [provider, models] of Object.entries(MODELS_GLOO)) {
 	const providerModels = modelRegistry.get(provider) ?? new Map<string, Model<Api>>();
 	for (const [id, model] of Object.entries(models)) {

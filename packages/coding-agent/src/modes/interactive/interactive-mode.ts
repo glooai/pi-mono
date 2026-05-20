@@ -179,30 +179,13 @@ function hasDefaultModelProvider(providerId: string): providerId is keyof typeof
 
 const BEDROCK_PROVIDER_ID = "amazon-bedrock";
 
-const API_KEY_LOGIN_PROVIDERS: Record<string, string> = {
-	anthropic: "Anthropic",
-	[BEDROCK_PROVIDER_ID]: "Amazon Bedrock",
-	"azure-openai-responses": "Azure OpenAI Responses",
-	cerebras: "Cerebras",
-	"cloudflare-workers-ai": "Cloudflare Workers AI",
-	deepseek: "DeepSeek",
-	fireworks: "Fireworks",
-	google: "Google Gemini",
-	"google-vertex": "Google Vertex AI",
-	groq: "Groq",
-	huggingface: "Hugging Face",
-	"kimi-coding": "Kimi For Coding",
-	mistral: "Mistral",
-	minimax: "MiniMax",
-	"minimax-cn": "MiniMax (China)",
-	opencode: "OpenCode Zen",
-	"opencode-go": "OpenCode Go",
-	openai: "OpenAI",
-	openrouter: "OpenRouter",
-	"vercel-ai-gateway": "Vercel AI Gateway",
-	xai: "xAI",
-	zai: "ZAI",
-};
+// GlooAI fork: Gloo is the ONLY provider. Gloo authenticates via OAuth2
+// client-credentials (handled through the OAuth login path), so there are no
+// API-key login providers to offer. Emptying this map removes every non-Gloo
+// option from the `/login` picker — the picker's API-key branch
+// (getLoginProviderOptions) iterates this map and now contributes nothing,
+// leaving only the Gloo OAuth provider.
+const API_KEY_LOGIN_PROVIDERS: Record<string, string> = {};
 
 const BUILT_IN_API_KEY_LOGIN_PROVIDERS = new Set(Object.keys(API_KEY_LOGIN_PROVIDERS));
 const BUILT_IN_MODEL_PROVIDERS = new Set<string>(getProviders());

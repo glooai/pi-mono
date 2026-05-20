@@ -384,70 +384,15 @@ export const streamOpenAIResponses = createLazyStream(loadOpenAIResponsesProvide
 export const streamSimpleOpenAIResponses = createLazySimpleStream(loadOpenAIResponsesProviderModule);
 export const streamGloo = createLazyStream(loadGlooProviderModule);
 export const streamSimpleGloo = createLazySimpleStream(loadGlooProviderModule);
-const streamBedrockLazy = createLazyStream(loadBedrockProviderModule);
-const streamSimpleBedrockLazy = createLazySimpleStream(loadBedrockProviderModule);
+export const streamBedrockLazy = createLazyStream(loadBedrockProviderModule);
+export const streamSimpleBedrockLazy = createLazySimpleStream(loadBedrockProviderModule);
 
+// GlooAI fork: Gloo is the ONLY provider. Only the gloo API tag is registered,
+// so no other `model.api` can ever stream. The other providers' lazy stream
+// wrappers above are kept (dead) so this file diffs minimally against upstream
+// and re-registering any provider is a one-line change. The `streamGloo` wrapper
+// delegates to openai-completions internally, so that path stays exercised.
 export function registerBuiltInApiProviders(): void {
-	registerApiProvider({
-		api: "anthropic-messages",
-		stream: streamAnthropic,
-		streamSimple: streamSimpleAnthropic,
-	});
-
-	registerApiProvider({
-		api: "openai-completions",
-		stream: streamOpenAICompletions,
-		streamSimple: streamSimpleOpenAICompletions,
-	});
-
-	registerApiProvider({
-		api: "mistral-conversations",
-		stream: streamMistral,
-		streamSimple: streamSimpleMistral,
-	});
-
-	registerApiProvider({
-		api: "openai-responses",
-		stream: streamOpenAIResponses,
-		streamSimple: streamSimpleOpenAIResponses,
-	});
-
-	registerApiProvider({
-		api: "azure-openai-responses",
-		stream: streamAzureOpenAIResponses,
-		streamSimple: streamSimpleAzureOpenAIResponses,
-	});
-
-	registerApiProvider({
-		api: "openai-codex-responses",
-		stream: streamOpenAICodexResponses,
-		streamSimple: streamSimpleOpenAICodexResponses,
-	});
-
-	registerApiProvider({
-		api: "google-generative-ai",
-		stream: streamGoogle,
-		streamSimple: streamSimpleGoogle,
-	});
-
-	registerApiProvider({
-		api: "google-gemini-cli",
-		stream: streamGoogleGeminiCli,
-		streamSimple: streamSimpleGoogleGeminiCli,
-	});
-
-	registerApiProvider({
-		api: "google-vertex",
-		stream: streamGoogleVertex,
-		streamSimple: streamSimpleGoogleVertex,
-	});
-
-	registerApiProvider({
-		api: "bedrock-converse-stream",
-		stream: streamBedrockLazy,
-		streamSimple: streamSimpleBedrockLazy,
-	});
-
 	registerApiProvider({
 		api: "gloo-openai-completions",
 		stream: streamGloo,

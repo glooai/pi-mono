@@ -42,22 +42,17 @@ export * from "./types.js";
 // Provider Registry
 // ============================================================================
 
-import { anthropicOAuthProvider } from "./anthropic.js";
-import { githubCopilotOAuthProvider } from "./github-copilot.js";
+// GlooAI fork: only the Gloo OAuth provider is registered as built-in (see
+// BUILT_IN_OAUTH_PROVIDERS below). The other providers remain re-exported above
+// for direct importers, but are not imported here for registry inclusion.
 import { glooOAuthProvider } from "./gloo.js";
-import { antigravityOAuthProvider } from "./google-antigravity.js";
-import { geminiCliOAuthProvider } from "./google-gemini-cli.js";
-import { openaiCodexOAuthProvider } from "./openai-codex.js";
 import type { OAuthCredentials, OAuthProviderId, OAuthProviderInfo, OAuthProviderInterface } from "./types.js";
 
-const BUILT_IN_OAUTH_PROVIDERS: OAuthProviderInterface[] = [
-	anthropicOAuthProvider,
-	githubCopilotOAuthProvider,
-	geminiCliOAuthProvider,
-	antigravityOAuthProvider,
-	openaiCodexOAuthProvider,
-	glooOAuthProvider,
-];
+// GlooAI fork: Gloo is the ONLY login/logout provider. The other OAuth providers
+// are still imported/re-exported above for back-compat with anything that
+// references them directly, but they are intentionally absent from the built-in
+// registry so the `/login` and `/logout` pickers only ever offer Gloo.
+const BUILT_IN_OAUTH_PROVIDERS: OAuthProviderInterface[] = [glooOAuthProvider];
 
 const oauthProviderRegistry = new Map<string, OAuthProviderInterface>(
 	BUILT_IN_OAUTH_PROVIDERS.map((provider) => [provider.id, provider]),

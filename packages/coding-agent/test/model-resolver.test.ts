@@ -373,20 +373,10 @@ describe("resolveCliModel", () => {
 });
 
 describe("default model selection", () => {
-	test("openai defaults track current models", () => {
-		expect(defaultModelPerProvider.openai).toBe("gpt-5.4");
-		expect(defaultModelPerProvider["openai-codex"]).toBe("gpt-5.5");
-	});
-
-	test("zai, minimax, and cerebras defaults track current models", () => {
-		expect(defaultModelPerProvider.zai).toBe("glm-5.1");
-		expect(defaultModelPerProvider.minimax).toBe("MiniMax-M2.7");
-		expect(defaultModelPerProvider["minimax-cn"]).toBe("MiniMax-M2.7");
-		expect(defaultModelPerProvider.cerebras).toBe("zai-glm-4.7");
-	});
-
-	test("ai-gateway default tracks current model", () => {
-		expect(defaultModelPerProvider["vercel-ai-gateway"]).toBe("zai/glm-5.1");
+	test("gloo is the only provider and defaults to Gemini 3.5 Flash", () => {
+		// GlooAI fork: Gloo is the sole provider; the default map has one entry.
+		expect(Object.keys(defaultModelPerProvider)).toEqual(["gloo"]);
+		expect(defaultModelPerProvider.gloo).toBe("gloo-google-gemini-3.5-flash");
 	});
 
 	test("findInitialModel accepts explicit provider custom model ids", async () => {

@@ -90,13 +90,17 @@ describe("lazy provider module loading", () => {
 		expect(result.loadedSpecifiers).toEqual(["@anthropic-ai/sdk"]);
 	});
 
-	it("loads only the Anthropic SDK when dispatching through streamSimple", () => {
+	it("loads only the OpenAI SDK when dispatching the gloo provider through streamSimple", () => {
+		// GlooAI fork: gloo is the only registered provider. Its stream wrapper
+		// delegates to the openai-completions implementation, which lazy-loads the
+		// OpenAI SDK on first dispatch. apiKey is supplied so the wrapper skips the
+		// OAuth token fetch and goes straight to the SDK path.
 		const result = runProbe(`
-			const model = mod.getModel("anthropic", "claude-sonnet-4-6");
+			const model = mod.getModel("gloo", "gloo-anthropic-claude-sonnet-4.5");
 			const context = { messages: [{ role: "user", content: "hi" }] };
-			await mod.streamSimple(model, context).result();
+			await mod.streamSimple(model, context, { apiKey: "test-key" }).result();
 		`);
 
-		expect(result.loadedSpecifiers).toEqual(["@anthropic-ai/sdk"]);
+		expect(result.loadedSpecifiers).toEqual(["openai"]);
 	});
 });

@@ -209,7 +209,7 @@ ${chalk.bold("Commands:")}
   ${APP_NAME} <command> --help          Show help for install/remove/uninstall/update/list
 
 ${chalk.bold("Options:")}
-  --provider <name>              Provider name (default: google)
+  --provider <name>              Provider name (default: gloo)
   --model <pattern>              Model pattern or ID (supports "provider/id" and optional ":<thinking>")
   --api-key <key>                API key (defaults to env vars)
   --system-prompt <text>         System prompt (default: coding assistant prompt)
@@ -223,7 +223,7 @@ ${chalk.bold("Options:")}
   --session-dir <dir>            Directory for session storage and lookup
   --no-session                   Don't save session (ephemeral)
   --models <patterns>            Comma-separated model patterns for Ctrl+P cycling
-                                 Supports globs (anthropic/*, *sonnet*) and fuzzy matching
+                                 Supports globs (gloo-google-*, *sonnet*) and fuzzy matching
   --no-tools, -nt                Disable all tools by default (built-in and extension)
   --no-builtin-tools, -nbt       Disable built-in tools by default but keep extension/custom tools enabled
   --tools, -t <tools>            Comma-separated allowlist of tool names to enable
@@ -266,23 +266,23 @@ ${chalk.bold("Examples:")}
   # Continue previous session
   ${APP_NAME} --continue "What did we discuss?"
 
-  # Use different model
-  ${APP_NAME} --provider openai --model gpt-4o-mini "Help me refactor this code"
+  # Use a specific model
+  ${APP_NAME} --model gloo-google-gemini-3.5-flash "Help me refactor this code"
 
-  # Use model with provider prefix (no --provider needed)
-  ${APP_NAME} --model openai/gpt-4o "Help me refactor this code"
+  # Use model with provider prefix
+  ${APP_NAME} --model gloo/gloo-anthropic-claude-sonnet-4.6 "Help me refactor this code"
 
   # Use model with thinking level shorthand
-  ${APP_NAME} --model sonnet:high "Solve this complex problem"
+  ${APP_NAME} --model "gloo-anthropic-claude-sonnet-4.6:high" "Solve this complex problem"
 
   # Limit model cycling to specific models
-  ${APP_NAME} --models claude-sonnet,claude-haiku,gpt-4o
+  ${APP_NAME} --models gloo-google-gemini-3.5-flash,gloo-anthropic-claude-sonnet-4.6
 
-  # Limit to a specific provider with glob pattern
-  ${APP_NAME} --models "github-copilot/*"
+  # Limit with a glob pattern
+  ${APP_NAME} --models "gloo-google-*"
 
   # Cycle models with fixed thinking levels
-  ${APP_NAME} --models sonnet:high,haiku:low
+  ${APP_NAME} --models "gloo-anthropic-claude-sonnet-4.6:high,gloo-google-gemini-3.5-flash:low"
 
   # Start with a specific thinking level
   ${APP_NAME} --thinking high "Solve this complex problem"

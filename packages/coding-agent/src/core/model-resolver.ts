@@ -10,40 +10,17 @@ import { isValidThinkingLevel } from "../cli/args.ts";
 import { DEFAULT_THINKING_LEVEL } from "./defaults.ts";
 import type { ModelRegistry } from "./model-registry.ts";
 
-/** Default model IDs for each known provider */
+/**
+ * Default model IDs for each known provider.
+ *
+ * GlooAI fork: Gloo is the ONLY provider, so this map has a single entry. The
+ * default-model auto-selection in this module iterates these keys; with only
+ * Gloo present, startup always lands on a Gloo model. The default is Gemini 3.5
+ * Flash (`gloo-google-gemini-3.5-flash`) — a fast, tool-capable model verified
+ * against the live Gloo `/platform/v2/models` catalog.
+ */
 export const defaultModelPerProvider: Record<KnownProvider, string> = {
-	"amazon-bedrock": "us.anthropic.claude-opus-4-6-v1",
-	anthropic: "claude-opus-4-7",
-	openai: "gpt-5.4",
-	"azure-openai-responses": "gpt-5.4",
-	"openai-codex": "gpt-5.5",
-	deepseek: "deepseek-v4-pro",
-	google: "gemini-3.1-pro-preview",
-	"google-vertex": "gemini-3.1-pro-preview",
-	"github-copilot": "gpt-5.4",
-	openrouter: "moonshotai/kimi-k2.6",
-	"vercel-ai-gateway": "zai/glm-5.1",
-	xai: "grok-4.20-0309-reasoning",
-	groq: "openai/gpt-oss-120b",
-	cerebras: "zai-glm-4.7",
-	zai: "glm-5.1",
-	mistral: "devstral-medium-latest",
-	minimax: "MiniMax-M2.7",
-	"minimax-cn": "MiniMax-M2.7",
-	moonshotai: "kimi-k2.6",
-	"moonshotai-cn": "kimi-k2.6",
-	huggingface: "moonshotai/Kimi-K2.6",
-	fireworks: "accounts/fireworks/models/kimi-k2p6",
-	together: "moonshotai/Kimi-K2.6",
-	opencode: "kimi-k2.6",
-	"opencode-go": "kimi-k2.6",
-	"kimi-coding": "kimi-for-coding",
-	"cloudflare-workers-ai": "@cf/moonshotai/kimi-k2.6",
-	"cloudflare-ai-gateway": "workers-ai/@cf/moonshotai/kimi-k2.6",
-	xiaomi: "mimo-v2.5-pro",
-	"xiaomi-token-plan-cn": "mimo-v2.5-pro",
-	"xiaomi-token-plan-ams": "mimo-v2.5-pro",
-	"xiaomi-token-plan-sgp": "mimo-v2.5-pro",
+	gloo: "gloo-google-gemini-3.5-flash",
 };
 
 export interface ScopedModel {

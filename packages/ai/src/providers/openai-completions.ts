@@ -1078,6 +1078,12 @@ function detectCompat(model: Model<"openai-completions">): ResolvedOpenAIComplet
 	const isCloudflareWorkersAI = provider === "cloudflare-workers-ai" || baseUrl.includes("api.cloudflare.com");
 	const isCloudflareAiGateway = provider === "cloudflare-ai-gateway" || baseUrl.includes("gateway.ai.cloudflare.com");
 
+	// Gloo AI hosts DeepSeek models behind its own OpenAI-compatible endpoint
+	// (provider="gloo", baseUrl=platform.ai.gloo.com). Treat those as DeepSeek
+	// for streaming-format purposes so reasoning_content deltas and the
+	// deepseek thinkingFormat are activated.
+	const isGlooDeepSeek = provider === "gloo" && model.id.startsWith("gloo-deepseek-");
+
 	const isNonStandard =
 		provider === "cerebras" ||
 		baseUrl.includes("cerebras.ai") ||
@@ -1086,6 +1092,7 @@ function detectCompat(model: Model<"openai-completions">): ResolvedOpenAIComplet
 		isTogether ||
 		baseUrl.includes("chutes.ai") ||
 		baseUrl.includes("deepseek.com") ||
+		isGlooDeepSeek ||
 		isZai ||
 		isMoonshot ||
 		provider === "opencode" ||
@@ -1096,7 +1103,7 @@ function detectCompat(model: Model<"openai-completions">): ResolvedOpenAIComplet
 	const useMaxTokens = baseUrl.includes("chutes.ai") || isMoonshot || isCloudflareAiGateway || isTogether;
 
 	const isGrok = provider === "xai" || baseUrl.includes("api.x.ai");
-	const isDeepSeek = provider === "deepseek" || baseUrl.includes("deepseek.com");
+	const isDeepSeek = provider === "deepseek" || baseUrl.includes("deepseek.com") || isGlooDeepSeek;
 	const cacheControlFormat = provider === "openrouter" && model.id.startsWith("anthropic/") ? "anthropic" : undefined;
 
 	return {

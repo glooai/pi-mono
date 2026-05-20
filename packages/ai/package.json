@@ -42,6 +42,10 @@
 			"types": "./dist/providers/openai-responses.d.ts",
 			"import": "./dist/providers/openai-responses.js"
 		},
+		"./gloo": {
+			"types": "./dist/providers/gloo.d.ts",
+			"import": "./dist/providers/gloo.js"
+		},
 		"./oauth": {
 			"types": "./dist/oauth.d.ts",
 			"import": "./dist/oauth.js"
@@ -64,6 +68,7 @@
 		"generate-image-models": "node scripts/generate-image-models.ts",
 		"build": "npm run generate-models && npm run generate-image-models && tsgo -p tsconfig.build.json",
 		"test": "vitest --run",
+		"verify:gloo": "npx tsx scripts/verify-gloo.ts",
 		"prepublishOnly": "npm run clean && npm run build"
 	},
 	"dependencies": {

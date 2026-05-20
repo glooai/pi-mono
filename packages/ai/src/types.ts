@@ -12,7 +12,11 @@ export type KnownApi =
 	| "anthropic-messages"
 	| "bedrock-converse-stream"
 	| "google-generative-ai"
-	| "google-vertex";
+	| "google-vertex"
+	// Gloo AI — OpenAI-compatible wire format with OAuth2 client_credentials
+	// auth resolved at request time. Routed through a thin wrapper around
+	// the openai-completions stream that injects a fresh bearer token.
+	| "gloo-openai-completions";
 
 export type Api = KnownApi | (string & {});
 
@@ -20,39 +24,12 @@ export type KnownImagesApi = "openrouter-images";
 
 export type ImagesApi = KnownImagesApi | (string & {});
 
-export type KnownProvider =
-	| "amazon-bedrock"
-	| "anthropic"
-	| "google"
-	| "google-vertex"
-	| "openai"
-	| "azure-openai-responses"
-	| "openai-codex"
-	| "deepseek"
-	| "github-copilot"
-	| "xai"
-	| "groq"
-	| "cerebras"
-	| "openrouter"
-	| "vercel-ai-gateway"
-	| "zai"
-	| "mistral"
-	| "minimax"
-	| "minimax-cn"
-	| "moonshotai"
-	| "moonshotai-cn"
-	| "huggingface"
-	| "fireworks"
-	| "together"
-	| "opencode"
-	| "opencode-go"
-	| "kimi-coding"
-	| "cloudflare-workers-ai"
-	| "cloudflare-ai-gateway"
-	| "xiaomi"
-	| "xiaomi-token-plan-cn"
-	| "xiaomi-token-plan-ams"
-	| "xiaomi-token-plan-sgp";
+// GlooAI fork: Gloo is the ONLY first-class provider. `KnownProvider` is the set
+// of providers this fork is built around — trimming it to `"gloo"` keeps the
+// type surface honest (e.g. `defaultModelPerProvider` is a single-entry map) and
+// makes `getProviders()` typed as Gloo-only. `Provider` stays an open union so
+// custom/dynamic provider ids (models.json, extensions) still type-check.
+export type KnownProvider = "gloo";
 export type Provider = KnownProvider | string;
 
 export type KnownImagesProvider = "openrouter";

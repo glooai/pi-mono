@@ -14,7 +14,7 @@ interface AnthropicLongCacheRetentionE2ECase {
 	apiKey: string | undefined;
 }
 
-function getE2EApiKey(provider: KnownProvider): string | undefined {
+function getE2EApiKey(provider: string): string | undefined {
 	if (provider === "github-copilot") {
 		return githubCopilotToken;
 	}

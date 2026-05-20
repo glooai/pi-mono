@@ -28,8 +28,13 @@ describe("OAuthSelectorComponent", () => {
 	});
 
 	it("keeps built-in API key providers separate from OAuth-only providers", () => {
-		const oauthProviderIds = new Set(["anthropic", "github-copilot", "custom-oauth"]);
-		const builtInProviderIds = new Set(["anthropic", "github-copilot", "amazon-bedrock", "openai"]);
+		// In the gloo-only fork, API_KEY_LOGIN_PROVIDERS is empty, so there are no
+		// built-in API-key login providers. The contract is now:
+		//   - a built-in model provider id => false
+		//   - an OAuth provider id => false
+		//   - any other (unknown) id => true via the !oauthProviderIds fallback
+		const oauthProviderIds = new Set(["gloo", "github-copilot", "custom-oauth"]);
+		const builtInProviderIds = new Set(["gloo"]);
 
 		expect(isApiKeyLoginProvider("anthropic", oauthProviderIds, builtInProviderIds)).toBe(true);
 		expect(BUILT_IN_PROVIDER_DISPLAY_NAMES.anthropic).toBe("Anthropic");
@@ -37,7 +42,14 @@ describe("OAuthSelectorComponent", () => {
 		expect(isApiKeyLoginProvider("github-copilot", oauthProviderIds, builtInProviderIds)).toBe(false);
 		expect(isApiKeyLoginProvider("amazon-bedrock", oauthProviderIds, builtInProviderIds)).toBe(true);
 		expect(isApiKeyLoginProvider("custom-oauth", oauthProviderIds, builtInProviderIds)).toBe(false);
+		// Unknown providers (not a model provider, not OAuth) are treated as API-key login.
 		expect(isApiKeyLoginProvider("custom-api", oauthProviderIds, builtInProviderIds)).toBe(true);
+		expect(isApiKeyLoginProvider("some-proxy", oauthProviderIds, builtInProviderIds)).toBe(true);
+		// A built-in model provider id is not an API-key login provider.
+		expect(isApiKeyLoginProvider("gloo", oauthProviderIds, builtInProviderIds)).toBe(false);
+		// OAuth provider ids are not API-key login providers.
+		expect(isApiKeyLoginProvider("github-copilot", oauthProviderIds, builtInProviderIds)).toBe(false);
+		expect(isApiKeyLoginProvider("custom-oauth", oauthProviderIds, builtInProviderIds)).toBe(false);
 	});
 
 	it("shows stored OAuth auth distinctly in the API key selector", () => {
@@ -61,6 +73,32 @@ describe("OAuthSelectorComponent", () => {
 
 		expect(output).toContain("Anthropic");
 		expect(output).toContain("subscription configured");
+	});
+
+	it("shows a stored OAuth credential label when present", () => {
+		const authStorage = AuthStorage.inMemory({
+			gloo: {
+				type: "oauth",
+				access: "access-token",
+				refresh: "client-secret",
+				expires: Date.now() + 60_000,
+				clientId: "client-id",
+				baseUrl: "https://platform.ai.gloo.com",
+				label: "servant-internal",
+			},
+		});
+		const selector = new OAuthSelectorComponent(
+			"login",
+			authStorage,
+			[{ id: "gloo", name: "Gloo AI", authType: "oauth" }],
+			() => {},
+			() => {},
+		);
+
+		const output = stripAnsi(selector.render(120).join("\n"));
+
+		expect(output).toContain("Gloo AI");
+		expect(output).toContain("servant-internal configured");
 	});
 
 	it("shows environment API key auth as configured", () => {

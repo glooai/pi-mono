@@ -17,6 +17,16 @@ export {
 	normalizeDomain,
 	refreshGitHubCopilotToken,
 } from "./github-copilot.ts";
+export type { GlooOAuthCredentials, GlooTokenCache, GlooTokenOptions } from "./gloo.ts";
+// Gloo AI (OAuth2 client_credentials — non-interactive, no PKCE)
+export {
+	clearGlooTokenCache,
+	getGlooAccessToken,
+	getGlooTokenCache,
+	glooOAuthProvider,
+	loginGloo,
+	refreshGlooToken,
+} from "./gloo.ts";
 // OpenAI Codex (ChatGPT OAuth)
 export { loginOpenAICodex, openaiCodexOAuthProvider, refreshOpenAICodexToken } from "./openai-codex.ts";
 
@@ -26,16 +36,17 @@ export * from "./types.ts";
 // Provider Registry
 // ============================================================================
 
-import { anthropicOAuthProvider } from "./anthropic.ts";
-import { githubCopilotOAuthProvider } from "./github-copilot.ts";
-import { openaiCodexOAuthProvider } from "./openai-codex.ts";
+// GlooAI fork: only the Gloo OAuth provider is registered as built-in (see
+// BUILT_IN_OAUTH_PROVIDERS below). The other providers remain re-exported above
+// for direct importers, but are not imported here for registry inclusion.
+import { glooOAuthProvider } from "./gloo.ts";
 import type { OAuthCredentials, OAuthProviderId, OAuthProviderInfo, OAuthProviderInterface } from "./types.ts";
 
-const BUILT_IN_OAUTH_PROVIDERS: OAuthProviderInterface[] = [
-	anthropicOAuthProvider,
-	githubCopilotOAuthProvider,
-	openaiCodexOAuthProvider,
-];
+// GlooAI fork: Gloo is the ONLY login/logout provider. The other OAuth providers
+// are still imported/re-exported above for back-compat with anything that
+// references them directly, but they are intentionally absent from the built-in
+// registry so the `/login` and `/logout` pickers only ever offer Gloo.
+const BUILT_IN_OAUTH_PROVIDERS: OAuthProviderInterface[] = [glooOAuthProvider];
 
 const oauthProviderRegistry = new Map<string, OAuthProviderInterface>(
 	BUILT_IN_OAUTH_PROVIDERS.map((provider) => [provider.id, provider]),

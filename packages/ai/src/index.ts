@@ -6,11 +6,26 @@ export * from "./env-api-keys.ts";
 export * from "./image-models.ts";
 export * from "./images.ts";
 export * from "./images-api-registry.ts";
+export {
+	clearGlooModelsCache,
+	type FetchedGlooModels,
+	type FetchGlooModelsOptions,
+	fetchGlooModels,
+} from "./models.gloo.fetch.ts";
 export * from "./models.ts";
 export type { BedrockOptions, BedrockThinkingDisplay } from "./providers/amazon-bedrock.ts";
 export type { AnthropicEffort, AnthropicOptions, AnthropicThinkingDisplay } from "./providers/anthropic.ts";
 export type { AzureOpenAIResponsesOptions } from "./providers/azure-openai-responses.ts";
 export * from "./providers/faux.ts";
+export type { GlooOptions } from "./providers/gloo.ts";
+// Blocklist API comes from the dependency-free module so the barrel stays free
+// of provider-SDK side effects (see lazy-module-load.test.ts). GlooOptions is a
+// type-only export — erased at runtime, so it does not load providers/gloo.ts.
+export {
+	GLOO_TOOLCALL_BLOCKLIST,
+	getGlooToolcallBlocklist,
+	setGlooToolcallBlocklist,
+} from "./providers/gloo-blocklist.ts";
 export type { GoogleOptions } from "./providers/google.ts";
 export type { GoogleThinkingLevel } from "./providers/google-shared.ts";
 export type { GoogleVertexOptions } from "./providers/google-vertex.ts";

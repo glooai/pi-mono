@@ -25,9 +25,11 @@ import { hasBedrockCredentials } from "./bedrock-utils.ts";
 describe("Amazon Bedrock Models", () => {
 	const models = getModels("amazon-bedrock");
 
-	it("should get all available Bedrock models", () => {
-		expect(models.length).toBeGreaterThan(0);
-		console.log(`Found ${models.length} Bedrock models`);
+	// GlooAI fork: Gloo is the only provider, so the Bedrock catalog is not loaded
+	// into the runtime registry. The credential-gated extensive request loop below
+	// iterates an empty list and therefore generates no E2E cases.
+	it("does not expose Bedrock models in the Gloo-only catalog", () => {
+		expect(models.length).toBe(0);
 	});
 
 	if (hasBedrockCredentials() && process.env.BEDROCK_EXTENSIVE_MODEL_TEST) {

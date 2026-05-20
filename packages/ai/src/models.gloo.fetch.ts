@@ -14,9 +14,16 @@
  *   source of `GlooModelId` autocomplete). This helper is consumed by the
  *   coding-agent's `ModelRegistry.hydrateGlooModels()`, which keeps the static
  *   set in place if the fetch fails.
- * - Mapped models keep `cost: 0` across the board: Gloo customers are billed via
- *   their platform contract, not per-token, so the endpoint's `pricing` block is
- *   intentionally ignored (matching `buildGlooModel` in `models.gloo.ts`).
+ * - Each model's `cost` is mapped from the endpoint's `pricing` block so the
+ *   coding-agent statusline can show a **rate-card cost estimate** (tokens ×
+ *   published per-million rates). This is an estimate, not the invoiced amount:
+ *   Gloo's `/ai/v2` inference response does not return an authoritative
+ *   per-request cost (no `cost` field, no `x-litellm-response-cost` header), so
+ *   the closest a client can get is the published list rate applied to the
+ *   server-returned token counts. The endpoint only exposes `input`/`output`
+ *   rates — there are no cache tiers — so `cacheRead`/`cacheWrite` stay 0.
+ *   The static catalog in `models.gloo.ts` keeps `cost: 0` as its offline
+ *   fallback (no estimate when the fetch is unavailable).
  *
  * Response shape is owned by `ai-api/app/api/platform/models_v2_get.py`
  * (`ModelsV2Response` / `ModelResponse`).
@@ -28,6 +35,18 @@ const DEFAULT_BASE_URL = "https://platform.ai.gloo.com";
 const DEFAULT_TIMEOUT_MS = 5000;
 const CACHE_TTL_MS = 5 * 60 * 1000; // mirror gloo-ai-studio's React Query staleTime
 
+/** A single per-token rate tier as returned by the platform. Rates are strings. */
+interface GlooPricingTier {
+	rate_per_1k_tokens?: string;
+	rate_per_1m_tokens?: string;
+}
+
+/** Per-model pricing block. The endpoint exposes input/output only (no cache tiers). */
+interface GlooPricing {
+	input?: GlooPricingTier;
+	output?: GlooPricingTier;
+}
+
 /** Subset of the platform's `ModelResponse` that we actually consume. */
 interface GlooModelResponse {
 	id: string;
@@ -37,6 +56,7 @@ interface GlooModelResponse {
 	input_modalities?: string[];
 	supports_reasoning?: boolean;
 	supports_tools?: boolean;
+	pricing?: GlooPricing;
 }
 
 interface GlooModelsV2Response {
@@ -80,6 +100,31 @@ function mapModalities(modalities: string[] | undefined): ("text" | "image")[] {
 	return mapped.length > 0 ? mapped : ["text"];
 }
 
+/**
+ * Parse a per-million-token rate string (e.g. `"0.15"`) into a number.
+ * Missing or non-numeric rates map to 0 so a malformed pricing block degrades
+ * to "no estimate" rather than NaN-poisoning `calculateCost`.
+ */
+function parseRatePerMillion(tier: GlooPricingTier | undefined): number {
+	const rate = Number.parseFloat(tier?.rate_per_1m_tokens ?? "");
+	return Number.isFinite(rate) ? rate : 0;
+}
+
+/**
+ * Map the endpoint's `pricing` block to pi-ai's `cost` (per-million-token rates).
+ * The platform exposes input/output only, so cache tiers stay 0 — `calculateCost`
+ * then estimates cost as `tokens × rate`. See the module header on why this is an
+ * estimate rather than the invoiced amount.
+ */
+function mapCost(pricing: GlooPricing | undefined): Model<"gloo-openai-completions">["cost"] {
+	return {
+		input: parseRatePerMillion(pricing?.input),
+		output: parseRatePerMillion(pricing?.output),
+		cacheRead: 0,
+		cacheWrite: 0,
+	};
+}
+
 function mapModel(entry: GlooModelResponse, base: string): Model<"gloo-openai-completions"> {
 	return {
 		id: entry.id,
@@ -89,7 +134,7 @@ function mapModel(entry: GlooModelResponse, base: string): Model<"gloo-openai-co
 		baseUrl: inferenceBaseUrl(base),
 		reasoning: entry.supports_reasoning ?? false,
 		input: mapModalities(entry.input_modalities),
-		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		cost: mapCost(entry.pricing),
 		contextWindow: entry.context_window,
 		maxTokens: entry.max_output_tokens,
 	};

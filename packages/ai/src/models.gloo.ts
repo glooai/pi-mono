@@ -11,9 +11,13 @@
  * Notes:
  * - `baseUrl` resolves at module load from `GLOO_BASE_URL` so tests and
  *   `gloo-local-dev` can swap to localhost without editing this file.
- * - `cost` is zero across the board because Gloo customers are billed via
- *   their platform contract, not per-token. Pi-ai's calculateCost therefore
- *   returns zero — that's correct, not a placeholder.
+ * - `cost` is zero across the board in this static catalog: it is the offline
+ *   fallback, and no per-token estimate is available without the live rate card.
+ *   At runtime `hydrateGlooModels()` replaces these entries with the live catalog
+ *   from `/platform/v2/models`, whose `pricing` block populates `cost` so the
+ *   statusline shows a rate-card cost estimate (see `models.gloo.fetch.ts`).
+ *   Gloo customers are still billed via their platform contract, not per-token,
+ *   so the displayed figure is an estimate, never the invoiced amount.
  * - Pi-ai's `Model` type doesn't have a `toolcall` flag, so the
  *   "platform rejects tools for this model" list lives next to the wrapper
  *   in `providers/gloo.ts` (`GLOO_TOOLCALL_BLOCKLIST`).

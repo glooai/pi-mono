@@ -13,32 +13,13 @@ afterEach(() => {
 });
 
 describe("Fireworks models", () => {
-	it("registers the default Kimi K2.6 model via Anthropic-compatible Messages API", () => {
-		const model = getModel("fireworks", "accounts/fireworks/models/kimi-k2p6");
-
-		expect(model).toBeDefined();
-		expect(model.api).toBe("anthropic-messages");
-		expect(model.provider).toBe("fireworks");
-		expect(model.baseUrl).toBe("https://api.fireworks.ai/inference");
-		expect(model.reasoning).toBe(true);
-		expect(model.input).toEqual(["text", "image"]);
-		expect(model.contextWindow).toBe(262000);
-		expect(model.maxTokens).toBe(262000);
-		expect(model.cost).toEqual({
-			input: 0.95,
-			output: 4,
-			cacheRead: 0.16,
-			cacheWrite: 0,
-		});
-	});
-
-	it("registers the Fire Pass turbo router model", () => {
-		const model = getModel("fireworks", "accounts/fireworks/routers/kimi-k2p5-turbo");
-
-		expect(model).toBeDefined();
-		expect(model.api).toBe("anthropic-messages");
-		expect(model.baseUrl).toBe("https://api.fireworks.ai/inference");
-		expect(model.input).toEqual(["text", "image"]);
+	// GlooAI fork: Gloo is the only provider, so the generated Fireworks catalog
+	// is intentionally not loaded into the runtime registry. The env-key
+	// resolution helpers are provider-agnostic and unaffected by that gating, so
+	// they keep their coverage below.
+	it("does not register Fireworks models in the Gloo-only catalog", () => {
+		expect(getModel("fireworks", "accounts/fireworks/models/kimi-k2p6")).toBeUndefined();
+		expect(getModel("fireworks", "accounts/fireworks/routers/kimi-k2p5-turbo")).toBeUndefined();
 	});
 
 	it("resolves FIREWORKS_API_KEY from the environment", () => {

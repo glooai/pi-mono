@@ -27,16 +27,24 @@ describe("OAuthSelectorComponent", () => {
 	});
 
 	it("keeps built-in API key providers separate from OAuth-only providers", () => {
-		const oauthProviderIds = new Set(["anthropic", "github-copilot", "custom-oauth"]);
-		const builtInProviderIds = new Set(["anthropic", "github-copilot", "amazon-bedrock", "openai"]);
+		// In the gloo-only fork, API_KEY_LOGIN_PROVIDERS is empty, so there are no
+		// built-in API-key login providers. The contract is now:
+		//   - a built-in model provider id => false
+		//   - an OAuth provider id => false
+		//   - any other (unknown) id => true via the !oauthProviderIds fallback
+		const oauthProviderIds = new Set(["gloo", "github-copilot", "custom-oauth"]);
+		const builtInProviderIds = new Set(["gloo"]);
 
-		expect(isApiKeyLoginProvider("anthropic", oauthProviderIds, builtInProviderIds)).toBe(true);
-		expect(getApiKeyProviderDisplayName("anthropic")).toBe("Anthropic");
-		expect(isApiKeyLoginProvider("openai", oauthProviderIds, builtInProviderIds)).toBe(true);
-		expect(isApiKeyLoginProvider("github-copilot", oauthProviderIds, builtInProviderIds)).toBe(false);
-		expect(isApiKeyLoginProvider("amazon-bedrock", oauthProviderIds, builtInProviderIds)).toBe(true);
-		expect(isApiKeyLoginProvider("custom-oauth", oauthProviderIds, builtInProviderIds)).toBe(false);
+		// Unknown providers (not a model provider, not OAuth) are treated as API-key login.
 		expect(isApiKeyLoginProvider("custom-api", oauthProviderIds, builtInProviderIds)).toBe(true);
+		expect(isApiKeyLoginProvider("some-proxy", oauthProviderIds, builtInProviderIds)).toBe(true);
+		// The display name of an unknown provider is the id itself (empty built-in map).
+		expect(getApiKeyProviderDisplayName("custom-api")).toBe("custom-api");
+		// A built-in model provider id is not an API-key login provider.
+		expect(isApiKeyLoginProvider("gloo", oauthProviderIds, builtInProviderIds)).toBe(false);
+		// OAuth provider ids are not API-key login providers.
+		expect(isApiKeyLoginProvider("github-copilot", oauthProviderIds, builtInProviderIds)).toBe(false);
+		expect(isApiKeyLoginProvider("custom-oauth", oauthProviderIds, builtInProviderIds)).toBe(false);
 	});
 
 	it("shows stored OAuth auth distinctly in the API key selector", () => {

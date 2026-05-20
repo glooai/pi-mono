@@ -20,34 +20,12 @@ export type KnownApi =
 
 export type Api = KnownApi | (string & {});
 
-export type KnownProvider =
-	| "amazon-bedrock"
-	| "anthropic"
-	| "google"
-	| "google-gemini-cli"
-	| "google-antigravity"
-	| "google-vertex"
-	| "openai"
-	| "azure-openai-responses"
-	| "openai-codex"
-	| "deepseek"
-	| "github-copilot"
-	| "xai"
-	| "groq"
-	| "cerebras"
-	| "openrouter"
-	| "vercel-ai-gateway"
-	| "zai"
-	| "mistral"
-	| "minimax"
-	| "minimax-cn"
-	| "huggingface"
-	| "fireworks"
-	| "opencode"
-	| "opencode-go"
-	| "kimi-coding"
-	| "cloudflare-workers-ai"
-	| "gloo";
+// GlooAI fork: Gloo is the ONLY first-class provider. `KnownProvider` is the set
+// of providers this fork is built around — trimming it to `"gloo"` keeps the
+// type surface honest (e.g. `defaultModelPerProvider` is a single-entry map) and
+// makes `getProviders()` typed as Gloo-only. `Provider` stays an open union so
+// custom/dynamic provider ids (models.json, extensions) still type-check.
+export type KnownProvider = "gloo";
 export type Provider = KnownProvider | string;
 
 export type ThinkingLevel = "minimal" | "low" | "medium" | "high" | "xhigh";

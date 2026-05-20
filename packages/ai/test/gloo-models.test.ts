@@ -123,6 +123,10 @@ describe("fetchGlooModels (dynamic discovery)", () => {
 				input_modalities: ["text", "image"],
 				supports_reasoning: true,
 				supports_tools: true,
+				pricing: {
+					input: { rate_per_1k_tokens: "0.00025", rate_per_1m_tokens: "0.25" },
+					output: { rate_per_1k_tokens: "0.002", rate_per_1m_tokens: "2" },
+				},
 			},
 			{
 				id: "gloo-google-gemini-2.5-flash",
@@ -170,8 +174,35 @@ describe("fetchGlooModels (dynamic discovery)", () => {
 		expect(mini?.input).toEqual(["text", "image"]);
 		expect(mini?.contextWindow).toBe(400_000);
 		expect(mini?.maxTokens).toBe(128_000);
-		// Billed by contract, not per-token — cost stays zero regardless of pricing.
-		expect(mini?.cost).toEqual({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
+		// `pricing` maps to a per-million-token rate-card estimate (input/output
+		// only; the endpoint exposes no cache tiers, so those stay 0).
+		expect(mini?.cost).toEqual({ input: 0.25, output: 2, cacheRead: 0, cacheWrite: 0 });
+	});
+
+	it("maps cost to 0 when a model has no pricing block", async () => {
+		mockModelsResponse(samplePayload);
+		const { models } = await fetchGlooModels({ force: true });
+		// The Gemini sample carries no `pricing` — degrade to no estimate, not NaN.
+		const flash = models.find((m) => m.id === "gloo-google-gemini-2.5-flash");
+		expect(flash?.cost).toEqual({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
+	});
+
+	it("maps a non-numeric rate to 0 rather than NaN", async () => {
+		mockModelsResponse({
+			object: "list",
+			data: [
+				{
+					id: "gloo-broken-pricing",
+					name: "Broken Pricing",
+					context_window: 1000,
+					max_output_tokens: 100,
+					input_modalities: ["text"],
+					pricing: { input: { rate_per_1m_tokens: "n/a" }, output: {} },
+				},
+			],
+		});
+		const { models } = await fetchGlooModels({ force: true });
+		expect(models[0]?.cost).toEqual({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
 	});
 
 	it("filters audio/video out of input modalities", async () => {

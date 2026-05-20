@@ -115,11 +115,18 @@ export class FooterComponent implements Component {
 		if (totalCacheRead) statsParts.push(`R${formatTokens(totalCacheRead)}`);
 		if (totalCacheWrite) statsParts.push(`W${formatTokens(totalCacheWrite)}`);
 
-		// Show cost with "(sub)" indicator if using OAuth subscription
+		// Gloo bills via platform contract, not per-token. The figure here is a
+		// rate-card ESTIMATE (server-returned token counts × the published
+		// per-million rates from /platform/v2/models), not the invoiced amount —
+		// Gloo's inference response carries no authoritative per-request cost.
+		// Mark it with `~` and `(est)` so it is never mistaken for the bill. When
+		// no estimate is available (cost 0, e.g. the pricing fetch failed), show a
+		// plain "(sub)" marker rather than a misleading "$0.000".
 		const usingSubscription = state.model ? this.session.modelRegistry.isUsingOAuth(state.model) : false;
-		if (totalCost || usingSubscription) {
-			const costStr = `$${totalCost.toFixed(3)}${usingSubscription ? " (sub)" : ""}`;
-			statsParts.push(costStr);
+		if (totalCost > 0) {
+			statsParts.push(`~$${totalCost.toFixed(3)} (est)`);
+		} else if (usingSubscription) {
+			statsParts.push("(sub)");
 		}
 
 		// Colorize context percentage based on usage

@@ -7,6 +7,7 @@ import {
 	type Api,
 	type AssistantMessageEventStream,
 	type Context,
+	fetchGlooModels,
 	getModels,
 	getProviders,
 	type KnownProvider,
@@ -17,6 +18,7 @@ import {
 	registerApiProvider,
 	resetApiProviders,
 	type SimpleStreamOptions,
+	setGlooToolcallBlocklist,
 } from "@mariozechner/pi-ai";
 import { registerOAuthProvider, resetOAuthProviders } from "@mariozechner/pi-ai/oauth";
 import { existsSync, readFileSync } from "fs";
@@ -318,6 +320,11 @@ export class ModelRegistry {
 	private modelRequestHeaders: Map<string, Record<string, string>> = new Map();
 	private registeredProviders: Map<string, ProviderConfigInput> = new Map();
 	private loadError: string | undefined = undefined;
+	// Live Gloo catalog fetched from the platform's public /platform/v2/models
+	// endpoint. When set, it replaces the static built-in gloo catalog during
+	// loadModels() so all the usual override/OAuth post-processing still applies.
+	// Persists across refresh() so a reload doesn't drop the live set.
+	private dynamicGlooModels: Model<Api>[] | undefined = undefined;
 
 	private constructor(
 		readonly authStorage: AuthStorage,
@@ -360,6 +367,36 @@ export class ModelRegistry {
 		return this.loadError;
 	}
 
+	/**
+	 * Replace the built-in gloo catalog with the live set from the platform's
+	 * public `/platform/v2/models` endpoint, and derive the tool-call blocklist
+	 * from each model's `supports_tools` flag. Best-effort: on any
+	 * network/HTTP/shape failure the static catalog and static blocklist stay in
+	 * place and `{ ok: false }` is returned (this never throws).
+	 *
+	 * Skipped (returns `{ ok: false }`) if no gloo provider is registered.
+	 */
+	async hydrateGlooModels(opts?: { signal?: AbortSignal }): Promise<{ ok: boolean; count?: number; error?: string }> {
+		if (!getProviders().includes("gloo" as KnownProvider)) {
+			return { ok: false, error: "gloo provider is not registered" };
+		}
+
+		try {
+			const { models, toolUnsupportedIds } = await fetchGlooModels({ signal: opts?.signal });
+			this.dynamicGlooModels = models as Model<Api>[];
+			// Re-run the full load pipeline so models.json overrides, provider
+			// overrides, and OAuth modifyModels all re-apply to the live catalog.
+			this.loadModels();
+			for (const [providerName, config] of this.registeredProviders.entries()) {
+				this.applyProviderConfig(providerName, config);
+			}
+			setGlooToolcallBlocklist(toolUnsupportedIds);
+			return { ok: true, count: models.length };
+		} catch (error) {
+			return { ok: false, error: error instanceof Error ? error.message : String(error) };
+		}
+	}
+
 	private loadModels(): void {
 		// Load custom models and overrides from models.json
 		const {
@@ -394,7 +431,11 @@ export class ModelRegistry {
 		modelOverrides: Map<string, Map<string, ModelOverride>>,
 	): Model<Api>[] {
 		return getProviders().flatMap((provider) => {
-			const models = getModels(provider as KnownProvider) as Model<Api>[];
+			// Prefer the dynamically-fetched live catalog for gloo when present.
+			const models =
+				provider === "gloo" && this.dynamicGlooModels
+					? this.dynamicGlooModels
+					: (getModels(provider as KnownProvider) as Model<Api>[]);
 			const providerOverride = overrides.get(provider);
 			const perModelOverrides = modelOverrides.get(provider);
 

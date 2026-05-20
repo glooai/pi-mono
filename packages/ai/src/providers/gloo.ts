@@ -36,6 +36,12 @@ import type {
 import { AssistantMessageEventStream } from "../utils/event-stream.js";
 import { getGlooAccessToken } from "../utils/oauth/gloo.js";
 import {
+	GLOO_TOOLCALL_BLOCKLIST,
+	getGlooToolcallBlocklist,
+	glooModelRejectsTools,
+	setGlooToolcallBlocklist,
+} from "./gloo-blocklist.js";
+import {
 	type OpenAICompletionsOptions,
 	streamOpenAICompletions,
 	streamSimpleOpenAICompletions,
@@ -43,23 +49,11 @@ import {
 
 export type GlooOptions = OpenAICompletionsOptions;
 
-/**
- * Models the Gloo platform rejects with HTTP 400
- * "model does not support function calling" — strip tools before delegating.
- *
- * Verified 2026-04-27 against platform.ai.gloo.com via the opencode fork's
- * gloo-models.test.ts; mirrored here so pi-coding-agent / pi-mom don't
- * silently fail when an agent loop tries to send tools to one of these.
- */
-export const GLOO_TOOLCALL_BLOCKLIST: ReadonlySet<string> = new Set([
-	"gloo-deepseek-r1",
-	"gloo-meta-llama-4-maverick",
-	"gloo-meta-llama-3.1-8b-instruct",
-]);
-
-function modelRejectsTools(modelId: string): boolean {
-	return GLOO_TOOLCALL_BLOCKLIST.has(modelId);
-}
+// The tool-call blocklist lives in the dependency-free `gloo-blocklist.ts` so it
+// can be re-exported from the package barrel without eagerly loading the OpenAI
+// SDK (this module statically imports openai-completions.ts). Re-exported here
+// for back-compat with direct importers (tests, verify-gloo).
+export { GLOO_TOOLCALL_BLOCKLIST, getGlooToolcallBlocklist, setGlooToolcallBlocklist };
 
 function castToOpenAIModel(model: Model<"gloo-openai-completions">): Model<"openai-completions"> {
 	// Same shape, swap the api tag so streamOpenAICompletions doesn't error
@@ -68,7 +62,7 @@ function castToOpenAIModel(model: Model<"gloo-openai-completions">): Model<"open
 }
 
 function stripToolsIfBlocked(model: Model<"gloo-openai-completions">, context: Context): Context {
-	if (!modelRejectsTools(model.id) || !context.tools || context.tools.length === 0) {
+	if (!glooModelRejectsTools(model.id) || !context.tools || context.tools.length === 0) {
 		return context;
 	}
 	return { ...context, tools: undefined };

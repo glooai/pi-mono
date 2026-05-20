@@ -158,6 +158,18 @@ export async function createAgentSessionServices(
 	extensionsResult.runtime.pendingProviderRegistrations = [];
 	diagnostics.push(...applyExtensionFlagValues(resourceLoader, options.extensionFlagValues));
 
+	// Discover the live Gloo model catalog from the platform's public endpoint
+	// (the runtime analog of Studio's useModels useEffect). Best-effort: on any
+	// failure the static built-in catalog stays in place. Done after extension
+	// provider registrations so the dynamic gloo set is the last word.
+	const glooHydration = await modelRegistry.hydrateGlooModels();
+	if (!glooHydration.ok && glooHydration.error && glooHydration.error !== "gloo provider is not registered") {
+		diagnostics.push({
+			type: "warning",
+			message: `Could not refresh Gloo models (using built-in catalog): ${glooHydration.error}`,
+		});
+	}
+
 	return {
 		cwd,
 		agentDir,

@@ -2,11 +2,19 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AnthropicMessagesCompat, Api, Context, Model, OpenAICompletionsCompat } from "@mariozechner/pi-ai";
-import { getApiProvider } from "@mariozechner/pi-ai";
+import { getApiProvider, getGlooToolcallBlocklist, setGlooToolcallBlocklist } from "@mariozechner/pi-ai";
 import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { AuthStorage } from "../src/core/auth-storage.js";
 import { clearApiKeyCache, ModelRegistry, type ProviderConfigInput } from "../src/core/model-registry.js";
+
+// Only `fetchGlooModels` is mocked; everything else (getProviders, getModels,
+// the real mutable blocklist) stays actual so hydration post-processing is exercised.
+const { fetchGlooModelsMock } = vi.hoisted(() => ({ fetchGlooModelsMock: vi.fn() }));
+vi.mock("@mariozechner/pi-ai", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@mariozechner/pi-ai")>();
+	return { ...actual, fetchGlooModels: fetchGlooModelsMock };
+});
 
 describe("ModelRegistry", () => {
 	let tempDir: string;
@@ -1416,5 +1424,75 @@ describe("ModelRegistry", () => {
 				}
 			});
 		});
+	});
+});
+
+describe("ModelRegistry.hydrateGlooModels", () => {
+	let tempDir: string;
+	let authStorage: AuthStorage;
+
+	function makeGlooModel(id: string, name: string) {
+		return {
+			id,
+			name,
+			api: "gloo-openai-completions",
+			provider: "gloo",
+			baseUrl: "https://platform.ai.gloo.com/ai/v2",
+			reasoning: false,
+			input: ["text"] as ("text" | "image")[],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 128000,
+			maxTokens: 8192,
+		};
+	}
+
+	beforeEach(() => {
+		tempDir = join(tmpdir(), `pi-test-gloo-hydrate-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+		mkdirSync(tempDir, { recursive: true });
+		authStorage = AuthStorage.create(join(tempDir, "auth.json"));
+		fetchGlooModelsMock.mockReset();
+		setGlooToolcallBlocklist(["gloo-deepseek-r1", "gloo-meta-llama-4-maverick", "gloo-meta-llama-3.1-8b-instruct"]);
+	});
+
+	afterEach(() => {
+		if (tempDir && existsSync(tempDir)) rmSync(tempDir, { recursive: true });
+		setGlooToolcallBlocklist(["gloo-deepseek-r1", "gloo-meta-llama-4-maverick", "gloo-meta-llama-3.1-8b-instruct"]);
+	});
+
+	test("replaces the gloo catalog and derives the blocklist on success", async () => {
+		const registry = ModelRegistry.create(authStorage, join(tempDir, "models.json"));
+		fetchGlooModelsMock.mockResolvedValue({
+			models: [makeGlooModel("gloo-dynamic-a", "Dynamic A"), makeGlooModel("gloo-dynamic-b", "Dynamic B")],
+			toolUnsupportedIds: new Set(["gloo-dynamic-b"]),
+		});
+
+		const result = await registry.hydrateGlooModels();
+
+		expect(result.ok).toBe(true);
+		expect(result.count).toBe(2);
+		const glooModels = registry.getAll().filter((m) => m.provider === "gloo");
+		expect(glooModels.map((m) => m.id).sort()).toEqual(["gloo-dynamic-a", "gloo-dynamic-b"]);
+		// Static catalog ids are gone, replaced by the live set.
+		expect(glooModels.find((m) => m.id === "gloo-anthropic-claude-sonnet-4.6")).toBeUndefined();
+		// Blocklist now reflects the live supports_tools flags.
+		const blocklist = getGlooToolcallBlocklist();
+		expect(blocklist.has("gloo-dynamic-b")).toBe(true);
+		expect(blocklist.has("gloo-deepseek-r1")).toBe(false);
+	});
+
+	test("keeps the static catalog and blocklist when the fetch fails", async () => {
+		const registry = ModelRegistry.create(authStorage, join(tempDir, "models.json"));
+		const before = registry.getAll().filter((m) => m.provider === "gloo").length;
+		fetchGlooModelsMock.mockRejectedValue(new Error("network down"));
+
+		const result = await registry.hydrateGlooModels();
+
+		expect(result.ok).toBe(false);
+		expect(result.error).toContain("network down");
+		const after = registry.getAll().filter((m) => m.provider === "gloo");
+		expect(after.length).toBe(before);
+		expect(after.find((m) => m.id === "gloo-anthropic-claude-sonnet-4.6")).toBeTruthy();
+		// Blocklist untouched (static fallback).
+		expect(getGlooToolcallBlocklist().has("gloo-deepseek-r1")).toBe(true);
 	});
 });

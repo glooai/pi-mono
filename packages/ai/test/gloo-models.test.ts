@@ -14,10 +14,16 @@
  * it can run as part of the regular `npm test` without flaking CI.
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { findEnvKeys, getEnvApiKey } from "../src/env-api-keys.js";
+import { clearGlooModelsCache, fetchGlooModels } from "../src/models.gloo.fetch.js";
 import { getModel, getModels, getProviders } from "../src/models.js";
-import { GLOO_TOOLCALL_BLOCKLIST, stripChatCompletionsSuffix } from "../src/providers/gloo.js";
+import {
+	GLOO_TOOLCALL_BLOCKLIST,
+	getGlooToolcallBlocklist,
+	setGlooToolcallBlocklist,
+	stripChatCompletionsSuffix,
+} from "../src/providers/gloo.js";
 import { streamSimple } from "../src/stream.js";
 import type { Context } from "../src/types.js";
 
@@ -90,6 +96,136 @@ describe("Gloo AI catalog (static)", () => {
 			if (original.secret !== undefined) process.env.GLOO_CLIENT_SECRET = original.secret;
 			else delete process.env.GLOO_CLIENT_SECRET;
 		}
+	});
+});
+
+describe("fetchGlooModels (dynamic discovery)", () => {
+	const realFetch = globalThis.fetch;
+
+	function mockModelsResponse(payload: unknown, ok = true, status = 200): void {
+		globalThis.fetch = vi.fn(async () => ({
+			ok,
+			status,
+			statusText: ok ? "OK" : "Error",
+			json: async () => payload,
+			text: async () => JSON.stringify(payload),
+		})) as unknown as typeof fetch;
+	}
+
+	const samplePayload = {
+		object: "list",
+		data: [
+			{
+				id: "gloo-openai-gpt-5-mini",
+				name: "GPT-5 Mini",
+				context_window: 400_000,
+				max_output_tokens: 128_000,
+				input_modalities: ["text", "image"],
+				supports_reasoning: true,
+				supports_tools: true,
+			},
+			{
+				id: "gloo-google-gemini-2.5-flash",
+				name: "Gemini 2.5 Flash",
+				context_window: 1_048_576,
+				max_output_tokens: 65_500,
+				// includes audio/video which pi-ai's Model.input cannot represent
+				input_modalities: ["text", "image", "audio", "video"],
+				supports_reasoning: false,
+				supports_tools: true,
+			},
+			{
+				id: "gloo-deepseek-r1",
+				name: "DeepSeek R1",
+				context_window: 128_000,
+				max_output_tokens: 8_192,
+				input_modalities: ["text"],
+				supports_reasoning: true,
+				supports_tools: false,
+			},
+		],
+	};
+
+	beforeEach(() => {
+		clearGlooModelsCache();
+	});
+
+	afterEach(() => {
+		globalThis.fetch = realFetch;
+		clearGlooModelsCache();
+		vi.restoreAllMocks();
+	});
+
+	it("maps the platform response to pi-ai model shape", async () => {
+		mockModelsResponse(samplePayload);
+		const { models } = await fetchGlooModels({ baseUrl: "https://platform.ai.gloo.com", force: true });
+
+		expect(models).toHaveLength(3);
+		const mini = models.find((m) => m.id === "gloo-openai-gpt-5-mini");
+		expect(mini).toBeTruthy();
+		expect(mini?.api).toBe("gloo-openai-completions");
+		expect(mini?.provider).toBe("gloo");
+		expect(mini?.baseUrl).toBe("https://platform.ai.gloo.com/ai/v2");
+		expect(mini?.reasoning).toBe(true);
+		expect(mini?.input).toEqual(["text", "image"]);
+		expect(mini?.contextWindow).toBe(400_000);
+		expect(mini?.maxTokens).toBe(128_000);
+		// Billed by contract, not per-token — cost stays zero regardless of pricing.
+		expect(mini?.cost).toEqual({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
+	});
+
+	it("filters audio/video out of input modalities", async () => {
+		mockModelsResponse(samplePayload);
+		const { models } = await fetchGlooModels({ force: true });
+		const flash = models.find((m) => m.id === "gloo-google-gemini-2.5-flash");
+		expect(flash?.input).toEqual(["text", "image"]);
+	});
+
+	it("collects supports_tools === false into toolUnsupportedIds", async () => {
+		mockModelsResponse(samplePayload);
+		const { toolUnsupportedIds } = await fetchGlooModels({ force: true });
+		expect(toolUnsupportedIds.has("gloo-deepseek-r1")).toBe(true);
+		expect(toolUnsupportedIds.has("gloo-openai-gpt-5-mini")).toBe(false);
+		expect(toolUnsupportedIds.size).toBe(1);
+	});
+
+	it("throws on non-200 so callers can fall back", async () => {
+		mockModelsResponse({ error: "boom" }, false, 503);
+		await expect(fetchGlooModels({ force: true })).rejects.toThrow(/503/);
+	});
+
+	it("throws on a malformed (non-list) payload", async () => {
+		mockModelsResponse({ object: "not-a-list", data: "nope" });
+		await expect(fetchGlooModels({ force: true })).rejects.toThrow(/list/);
+	});
+
+	it("caches within the TTL — second call does not re-fetch", async () => {
+		mockModelsResponse(samplePayload);
+		await fetchGlooModels({ baseUrl: "https://platform.ai.gloo.com" });
+		await fetchGlooModels({ baseUrl: "https://platform.ai.gloo.com" });
+		expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("Gloo tool-call blocklist (mutable)", () => {
+	afterEach(() => {
+		// Reset to the static seed for other tests in the suite.
+		setGlooToolcallBlocklist(GLOO_TOOLCALL_BLOCKLIST);
+	});
+
+	it("repopulates from a dynamic set", () => {
+		setGlooToolcallBlocklist(new Set(["gloo-deepseek-r1", "gloo-some-new-no-tools-model"]));
+		const live = getGlooToolcallBlocklist();
+		expect(live.has("gloo-some-new-no-tools-model")).toBe(true);
+		expect(live.has("gloo-meta-llama-4-maverick")).toBe(false);
+	});
+
+	it("falls back to the static seed when given an empty set", () => {
+		setGlooToolcallBlocklist([]);
+		const live = getGlooToolcallBlocklist();
+		expect(live.has("gloo-deepseek-r1")).toBe(true);
+		expect(live.has("gloo-meta-llama-4-maverick")).toBe(true);
+		expect(live.has("gloo-meta-llama-3.1-8b-instruct")).toBe(true);
 	});
 });
 
